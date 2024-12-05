@@ -1,2 +1,2 @@
 echo off
-"PRISMPYTHONFOLDER/python.exe" "SCRIPTSFOLDER/Prism_AfterEffects_MenuTools.py"  Export
+"PRISMPYTHONFOLDER/python.exe" "SCRIPTSFOLDER/Prism_Illustrator_MenuTools.py"  Export
