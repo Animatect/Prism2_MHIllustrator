@@ -55,7 +55,7 @@ from PrismUtils.Decorators import err_catcher as err_catcher
 logger = logging.getLogger(__name__)
 
 
-class Prism_Photoshop_Functions(object):
+class Prism_Illustrator_Functions(object):
     def __init__(self, core, plugin):
         self.core = core
         self.plugin = plugin
@@ -70,10 +70,12 @@ class Prism_Photoshop_Functions(object):
             "onProjectBrowserStartup", self.onProjectBrowserStartup, plugin=self.plugin
         )
 
-    @err_catcher(name=__name__)
     def startup(self, origin):
+        """
+        Initializes the connection to Adobe Illustrator and sets up the environment.
+        """
         origin.timer.stop()
-        self.core.setActiveStyleSheet("Photoshop")
+        self.core.setActiveStyleSheet("Illustrator")
         appIcon = QIcon(
             os.path.join(
                 self.core.prismRoot, "Scripts", "UserInterfacesPrism", "p_tray.png"
@@ -81,64 +83,68 @@ class Prism_Photoshop_Functions(object):
         )
         qApp.setWindowIcon(appIcon)
 
-        if self.win:
+        if self.win:  # For Windows
             excludes = []
             while True:
-                dname = self.getPhotoshopDispatchName(excludes=excludes)
-                self.psApp = None
+                dname = self.getIllustratorDispatchName(excludes=excludes)
+                self.ilApp = None
                 if dname:
                     try:
-                        self.psApp = win32com.client.Dispatch(dname)
-                        
+                        self.ilApp = win32com.client.Dispatch(dname)
                     except:
-                        self.psApp = None
+                        self.ilApp = None
                         excludes.append(dname)
                         continue
                     else:
                         try:
-                            self.psApp.ActiveDocument
+                            self.ilApp.Application.ActiveDocument
                         except AttributeError:
-                            self.psApp = None
+                            self.ilApp = None
                             excludes.append(dname)
                             continue
                         except:
                             pass
 
-                if not self.psApp:
-                    msg = "Could not connect to Photoshop."
+                if not self.ilApp:
+                    msg = "Could not connect to Illustrator."
                     self.core.popup(msg)
                     return
 
-                self.dispatchSuffix = dname.replace("Photoshop.Application", "")
-                logger.debug("using %s" % dname)
+                self.dispatchSuffix = dname.replace("Illustrator.Application", "")
+                logger.debug("Using %s" % dname)
                 break
-        else:
-            self.psAppName = "Adobe Photoshop CC 2019"
+        else:  # For macOS
+            self.ilAppName = "Adobe Illustrator 2023"
             for foldercont in os.walk("/Applications"):
                 for folder in reversed(sorted(foldercont[1])):
-                    if folder.startswith("Adobe Photoshop"):
-                        self.psAppName = folder
+                    if folder.startswith("Adobe Illustrator"):
+                        self.ilAppName = folder
                         break
                 break
 
             scpt = (
                 """
-            tell application "%s"
-                activate
-            end tell
-            """
-                % self.psAppName
+                tell application "%s"
+                    activate
+                end tell
+                """
+                % self.ilAppName
             )
             self.executeAppleScript(scpt)
 
+
     @err_catcher(name=__name__)
-    def getPhotoshopDispatchName(self, excludes=None):
-        envkey = os.getenv("PRISM_PHOTOSHOP_KEY")
+    def getIllustratorDispatchName(self, excludes=None):
+        """
+        Finds an appropriate Illustrator dispatch name for Windows.
+        """
+        envkey = os.getenv("PRISM_ILLUSTRATOR_KEY")
         if envkey:
             return envkey
 
-        name = "Photoshop.Application"
+        name = "Illustrator.Application"
         classBase = "SOFTWARE\\Classes\\"
+
         try:
             if excludes and name in excludes:
                 raise Exception()
@@ -168,10 +174,10 @@ class Prism_Photoshop_Functions(object):
                         i += 1
                         continue
 
-                    if classNameKey.startswith("Photoshop.Application."):
+                    if classNameKey.startswith("Illustrator.Application."):
                         if keyName:
                             try:
-                                if float(classNameKey.replace("Photoshop.Application.", "")) > float(keyName.replace("Photoshop.Application.", "")):
+                                if float(classNameKey.replace("Illustrator.Application.", "")) > float(keyName.replace("Illustrator.Application.", "")):
                                     keyName = classNameKey
                             except:
                                 pass
@@ -188,50 +194,66 @@ class Prism_Photoshop_Functions(object):
         else:
             return name
 
+
     @err_catcher(name=__name__)
     def sceneOpen(self, origin):
         pass
 
     @err_catcher(name=__name__)
     def executeAppleScript(self, script):
-        p = subprocess.Popen(
-            ["osascript"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        stdout, stderr = p.communicate(script)
-        if p.returncode != 0:
+        try:
+            p = subprocess.Popen(
+                ["osascript"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True  # Ensures proper string handling for Python 3
+            )
+            stdout, stderr = p.communicate(script)
+            if p.returncode != 0:
+                # Log the error message for debugging
+                self.core.popup(f"AppleScript execution failed:\n{stderr.strip()}")
+                return None
+
+            return stdout.strip()  # Clean up the output
+        except Exception as e:
+            self.core.popup(f"An error occurred while executing AppleScript:\n{str(e)}")
             return None
-
-        return stdout
-
+    
     @err_catcher(name=__name__)
     def getCurrentFileName(self, origin, path=True):
+        """
+        Get the current file name of the active document in Illustrator.
+        If `path` is False, only the file name is returned.
+        """
         try:
-            if self.win:
-                doc = self.psApp.Application.ActiveDocument
-                currentFileName = doc.FullName
-            else:
+            if self.win:  # For Windows
+                doc = self.ilApp.Application.ActiveDocument  # Access Illustrator application
+                currentFileName = doc.FullName if doc.Saved else ""
+            else:  # For macOS
                 scpt = (
                     """
-                tell application "%s"
-                    set fpath to file path of current document
-                    POSIX path of fpath
-                end tell
-                """
-                    % self.psAppName
+                    tell application "Adobe Illustrator"
+                        set fpath to file path of current document
+                        if fpath is missing value then
+                            return ""
+                        else
+                            return POSIX path of fpath
+                        end if
+                    end tell
+                    """
                 )
                 currentFileName = self.executeAppleScript(scpt)
 
                 if currentFileName is None:
-                    raise
+                    raise Exception("No file path found")
 
                 if currentFileName.endswith("\n"):
                     currentFileName = currentFileName[:-1]
 
-        except:
+        except Exception as e:
             currentFileName = ""
+            print(f"Error getting current file name: {e}")
 
         if not path and currentFileName != "":
             currentFileName = os.path.basename(currentFileName)
@@ -265,96 +287,78 @@ class Prism_Photoshop_Functions(object):
     def onGetSaveExtendedDetails(self, origin, details):
         details["fileFormat"] = origin.cb_format.currentText()
 
+    # Adobe Illustrator does not have native equivalents for CharIDToTypeID and StringIDToTypeID, 
+    # as these are specific to Photoshop's scripting model.
+    # Instead, we added error handling to notify the user if these methods are called.
     @err_catcher(name=__name__)
     def getCharID(self, s):
-        return self.psApp.CharIDToTypeID(s)
+        try:
+            return self.ilApp.CharIDToTypeID(s)
+        except AttributeError:
+            self.core.popup("Illustrator does not support CharIDToTypeID.")
+            return None
 
     @err_catcher(name=__name__)
     def getStringID(self, s):
-        return self.psApp.StringIDToTypeID(s)
+        try:
+            return self.ilApp.StringIDToTypeID(s)
+        except AttributeError:
+            self.core.popup("Illustrator does not support StringIDToTypeID.")
+            return None
 
     @err_catcher(name=__name__)
     def saveScene(self, origin, filepath, details={}):
+        """
+        Saves the current Illustrator document to the specified filepath.
+        If "fileFormat" is in `details`, appends the file extension to the filepath.
+        """
         try:
-            if self.win:
-                doc = self.psApp.ActiveDocument
-            else:
+            # Access the active document
+            if self.win:  # Windows
+                doc = self.ilApp.Application.ActiveDocument
+            else:  # macOS
                 scpt = (
                     """
-                tell application "%s"
-                    set fpath to name of current document
-                    POSIX path of fpath
-                end tell
-                """
-                    % self.psAppName
+                    tell application "Adobe Illustrator"
+                        set doc to the current document
+                        if doc is missing value then return ""
+                        set docName to name of doc
+                    end tell
+                    """
                 )
-                name = self.executeAppleScript(scpt)
-                if name is None:
-                    raise
-        except:
-            self.core.popup("There is no active document in Photoshop.")
+                doc = self.executeAppleScript(scpt)
+                if doc is None or doc == "":
+                    raise Exception("No active document found")
+
+        except Exception as e:
+            self.core.popup("There is no active document in Illustrator.")
+            print(f"Error: {e}")
             return False
 
+        # Handle file extension
         if "fileFormat" in details:
             filepath = os.path.splitext(filepath)[0] + details["fileFormat"]
 
         try:
-            if self.win:
-                if os.path.splitext(filepath)[1] == ".psb":
-                    desc1 = win32com.client.Dispatch("Photoshop.ActionDescriptor" + self.dispatchSuffix)
-                    desc2 = win32com.client.Dispatch("Photoshop.ActionDescriptor" + self.dispatchSuffix)
-                    desc2.PutBoolean(self.getStringID("maximizeCompatibility"), True)
-                    desc1.PutObject(
-                        self.getCharID("As  "), self.getCharID("Pht8"), desc2
-                    )
-                    desc1.PutPath(self.getCharID("In  "), filepath)
-                    desc1.PutBoolean(self.getCharID("LwCs"), True)
-                    self.psApp.ExecuteAction(self.getCharID("save"), desc1)
-                else:
-                    filepath = os.path.normpath(filepath)
-                    doc.SaveAs(filepath)
-            else:
-                if os.path.splitext(filepath)[1] == ".psb":
-                    scpt = """
-                    tell application "%s"
-                        do javascript "
-                            var idsave = charIDToTypeID( 'save' );
-                            var desc12 = new ActionDescriptor();
-                            var idAs = charIDToTypeID( 'As  ' );
-                            var desc13 = new ActionDescriptor();
-                            var idmaximizeCompatibility = stringIDToTypeID( 'maximizeCompatibility' );
-                            desc13.putBoolean( idmaximizeCompatibility, true );
-                            var idPhteight = charIDToTypeID( 'Pht8' );
-                            desc12.putObject( idAs, idPhteight, desc13 );
-                            var idIn = charIDToTypeID( 'In  ' );
-                            desc12.putPath( idIn, new File( '%s' ) );
-                            var idsaveStage = stringIDToTypeID( 'saveStage' );
-                            var idsaveStageType = stringIDToTypeID( 'saveStageType' );
-                            var idsaveSucceeded = stringIDToTypeID( 'saveSucceeded' );
-                            desc12.putEnumerated( idsaveStage, idsaveStageType, idsaveSucceeded );
-                            executeAction( idsave, desc12, DialogModes.NO );
-                        " show debugger on runtime error
-                    end tell
-                    """ % (
-                        self.psAppName,
-                        filepath,
-                    )
-                    doc = self.executeAppleScript(scpt)
-                else:
-                    scpt = """
-                    tell application "%s"
-                        save current document in file "%s"
-                    end tell
-                    """ % (
-                        self.psAppName,
-                        filepath,
-                    )
-                    doc = self.executeAppleScript(scpt)
+            # Save the document
+            if self.win:  # Windows
+                filepath = os.path.normpath(filepath)
+                doc.SaveAs(filepath)
+            else:  # macOS
+                scpt = """
+                tell application "Adobe Illustrator"
+                    save current document in POSIX file "%s" as Illustrator
+                end tell
+                """ % filepath
+                result = self.executeAppleScript(scpt)
+                if result is None:
+                    raise Exception("Failed to save document")
 
-                if doc is None:
-                    raise
-        except:
-            return ""
+        except Exception as e:
+            self.core.popup(f"Failed to save the document: {e}")
+            return False
+
+        return True
 
     @err_catcher(name=__name__)
     def getImportPaths(self, origin):
@@ -375,7 +379,7 @@ class Prism_Photoshop_Functions(object):
     @err_catcher(name=__name__)
     def getAppVersion(self, origin):
         if self.win:
-            version = self.psApp.Version
+            version = self.ilApp.Version
         else:
             scpt = (
                 """
@@ -392,12 +396,12 @@ class Prism_Photoshop_Functions(object):
     @err_catcher(name=__name__)
     def onProjectBrowserStartup(self, origin):
         origin.actionStateManager.setEnabled(False)
-        psMenu = QMenu("Photoshop", origin)
-        psAction = QAction("Open tools", origin)
-        psAction.triggered.connect(self.openPhotoshopTools)
-        psMenu.addAction(psAction)
+        ilMenu = QMenu("Illustrator", origin)
+        ilAction = QAction("Open tools", origin)
+        ilAction.triggered.connect(self.openIllustratorTools)
+        ilMenu.addAction(ilAction)
         origin.menuTools.addSeparator()
-        origin.menuTools.addMenu(psMenu)
+        origin.menuTools.addMenu(ilMenu)
 
     @err_catcher(name=__name__)
     def openScene(self, origin, filepath, force=False):
@@ -405,7 +409,7 @@ class Prism_Photoshop_Functions(object):
             return False
 
         if self.win:
-            self.psApp.Open(filepath)
+            self.ilApp.Open(filepath)
         else:
             scpt = """
                 tell application "%s"
@@ -480,7 +484,7 @@ class Prism_Photoshop_Functions(object):
             )
 
     @err_catcher(name=__name__)
-    def openPhotoshopTools(self):
+    def openIllustratorTools(self):
         self.dlg_tools = QDialog()
 
         lo_tools = QVBoxLayout()
@@ -636,7 +640,7 @@ class Prism_Photoshop_Functions(object):
 
         self.exportGetTasks()
         self.core.callback(
-            name="photoshop_onExportOpen",
+            name="Illustrator_onExportOpen",
             args=[self],
         )
 
@@ -766,7 +770,7 @@ class Prism_Photoshop_Functions(object):
             outLength = len(outputPath)
             if platform.system() == "Windows" and os.getenv("PRISM_IGNORE_PATH_LENGTH") != "1" and outLength > 255:
                 msg = (
-                    "The outputpath is longer than 255 characters (%s), which is not supported on Windows. Please shorten the outputpath by changing the comment, identifier or projectpath."
+                    "The output path is longer than 255 characters (%s), which is not supported on Windows. Please shorten the output path by changing the comment, identifier, or project path."
                     % outLength
                 )
                 self.core.popup(msg)
@@ -799,7 +803,7 @@ class Prism_Photoshop_Functions(object):
                 self.dlg_export,
                 "Enter output filename",
                 startLocation,
-                "JPEG (*.jpg *.jpeg);;PNG (*.png);;TIFF (*.tif *.tiff);;OpenEXR (*.exr)",
+                "JPEG (*.jpg *.jpeg);;PNG (*.png);;TIFF (*.tif *.tiff);;SVG (*.svg)",
             )[0]
 
             if outputPath == "":
@@ -809,7 +813,7 @@ class Prism_Photoshop_Functions(object):
         self.handleMasterVersion(outputPath)
         self.dlg_export.accept()
         self.core.copyToClipboard(outputPath, file=True)
-        self.core.callback(name="photoshop_onImageExported", args=[self, outputPath])
+        self.core.callback(name="illustrator_onImageExported", args=[self, outputPath])
 
         try:
             self.core.pb.refreshRender()
@@ -829,54 +833,51 @@ class Prism_Photoshop_Functions(object):
                 "Unknown error. Image file doesn't exist:\n\n%s" % outputPath,
             )
 
+
     @err_catcher(name=__name__)
     def exportImageToPath(self, outputPath):
         ext = os.path.splitext(outputPath)[1].lower()
-        bdepth = self.psApp.Application.ActiveDocument.bitsPerChannel
-        if ext in [".exr"]:
-            if bdepth != 32:
+        activeDoc = self.ilApp.ActiveDocument
+
+        try:
+            # Check if the file extension is supported
+            if ext in [".jpg", ".jpeg"]:
+                exportOptions = win32com.client.Dispatch("Illustrator.ExportOptionsJPEG")
+                exportOptions.qualitySetting = 100  # Maximum quality
+                exportType = 1  # Illustrator constant for JPEG
+
+            elif ext == ".png":
+                exportOptions = win32com.client.Dispatch("Illustrator.ExportOptionsPNG24")
+                exportOptions.transparency = True  # Maintain transparency
+                exportType = 2  # Illustrator constant for PNG24
+
+            elif ext in [".tif", ".tiff"]:
+                exportOptions = win32com.client.Dispatch("Illustrator.ExportOptionsTIFF")
+                exportOptions.resolution = 300  # DPI
+                exportType = 3  # Illustrator constant for TIFF
+
+            elif ext == ".svg":
+                exportOptions = win32com.client.Dispatch("Illustrator.ExportOptionsSVG")
+                exportOptions.fontSubsetting = 2  # Subset fonts if applicable
+                exportOptions.coordinatePrecision = 2  # Precision for SVG coordinates
+                exportType = 4  # Illustrator constant for SVG
+
+            else:
                 QMessageBox.warning(
                     self.core.messageParent,
                     "Export",
-                    "To export in this format you need to set the bit depth of your current document to 32.",
+                    f"Unsupported export format: {ext}",
                 )
-                return
+                return False
 
-            descr = win32com.client.dynamic.Dispatch("Photoshop.ActionDescriptor" + self.dispatchSuffix)
-            descr.PutString(self.getCharID("As  "), "OpenEXR")
-            descr.PutPath(self.getCharID("In  "), outputPath)
-            descr.PutBoolean(self.getCharID("LwCs"), True)
-            descr.PutBoolean(self.getCharID("Cpy "), True)
-            descr.PutEnumerated(
-                self.getStringID("saveStage"),
-                self.getStringID("saveStageType"),
-                self.getStringID("saveSucceeded"),
-            )
-            self.psApp.ExecuteAction(self.getCharID("save"), descr, 3)
-        else:
-            if bdepth == 32:
-                msg = "To export in this format you need to lower the bit depth of your current document."
-                result = self.core.popupQuestion(msg, buttons=["Lower bit depth and continue", "Cancel"], icon=QMessageBox.Warning)
-                if result != "Lower bit depth and continue":
-                    return
+            # Export the file
+            activeDoc.Export(outputPath, exportType, exportOptions)
+            return True
 
-                self.psApp.Application.ActiveDocument.bitsPerChannel = 16
+        except Exception as e:
+            self.core.popup(f"Failed to export the file: {str(e)}")
+            return False
 
-            if ext in [".jpg", ".jpeg"]:
-                options = win32com.client.dynamic.Dispatch(
-                    "Photoshop.JPEGSaveOptions" + self.dispatchSuffix
-                )
-                options.quality = 10
-            elif ext in [".png"]:
-                options = win32com.client.dynamic.Dispatch(
-                    "Photoshop.PNGSaveOptions" + self.dispatchSuffix
-                )
-            elif ext in [".tif", ".tiff"]:
-                options = win32com.client.dynamic.Dispatch(
-                    "Photoshop.TiffSaveOptions" + self.dispatchSuffix
-                )
-
-            self.psApp.Application.ActiveDocument.SaveAs(outputPath, options, True)
 
     @err_catcher(name=__name__)
     def isUsingMasterVersion(self):

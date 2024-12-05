@@ -35,17 +35,17 @@
 import os
 
 
-class Prism_Photoshop_Variables(object):
+class Prism_Illustrator_Variables(object):
     def __init__(self, core, plugin):
         self.version = "v2.0.5"
-        self.pluginName = "Photoshop"
+        self.pluginName = "Illustrator"
         self.pluginType = "App"
-        self.appShortName = "Photoshop"
+        self.appShortName = "Illustrator"
         self.appType = "2d"
         self.hasQtParent = False
-        self.sceneFormats = [".psd", ".psb"]
+        self.sceneFormats = [".ai"]
         self.appSpecificFormats = self.sceneFormats
-        self.appColor = [115, 172, 230]
+        self.appColor = [255, 154, 0]
         self.hasFrameRange = False
         self.canOverrideExecuteable = False
         self.platforms = ["Windows", "Darwin"]
@@ -53,5 +53,5 @@ class Prism_Photoshop_Variables(object):
             os.path.dirname(os.path.dirname(__file__))
         )
         self.appIcon = os.path.join(
-            self.pluginDirectory, "UserInterfaces", "photoshop.ico"
+            self.pluginDirectory, "UserInterfaces", "illustrator.ico"
         )

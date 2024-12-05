@@ -42,7 +42,7 @@ from qtpy.QtWidgets import *
 from PrismUtils.Decorators import err_catcher_plugin as err_catcher
 
 
-class Prism_Photoshop_externalAccess_Functions(object):
+class Prism_Illustrator_externalAccess_Functions(object):
     def __init__(self, core, plugin):
         self.core = core
         self.plugin = plugin
@@ -53,17 +53,21 @@ class Prism_Photoshop_externalAccess_Functions(object):
         ssheetPath = os.path.join(
             self.pluginDirectory,
             "UserInterfaces",
-            "PhotoshopStyleSheet"
+            "IllustratorStyleSheet"
         )
         self.core.registerStyleSheet(ssheetPath)
 
     @err_catcher(name=__name__)
     def getAutobackPath(self, origin):
-        autobackpath = ""
+        """
+        Retrieves the auto-backup path and supported file formats for Illustrator.
+        """
+        autobackpath = ""  # Placeholder for the auto-backup path logic
 
-        fileStr = "Photoshop Script ("
-        for i in self.sceneFormats:
-            fileStr += "*%s " % i
+        # Generate the file format string for Illustrator
+        fileStr = "Illustrator Files ("
+        for fmt in self.sceneFormats:
+            fileStr += f"*{fmt} "
 
         fileStr += ")"
 
@@ -72,27 +76,32 @@ class Prism_Photoshop_externalAccess_Functions(object):
     @err_catcher(name=__name__)
     def projectBrowser_loadUI(self, origin):
         if self.core.appPlugin.pluginName == "Standalone":
-            psMenu = QMenu("Photoshop")
-            path = os.path.join(self.pluginDirectory, "UserInterfaces", "photoshop.ico")
+            illustratorMenu = QMenu("Illustrator")
+            path = os.path.join(self.pluginDirectory, "UserInterfaces", "Illustrator.ico")
             icon = QIcon(path)
-            psMenu.setIcon(icon)
-            psAction = QAction("Connect", origin)
-            psAction.triggered.connect(lambda: self.connectToPhotoshop(origin))
-            psMenu.addAction(psAction)
+            illustratorMenu.setIcon(icon)
+            
+            illustratorAction = QAction("Connect", origin)
+            illustratorAction.triggered.connect(lambda: self.connectToIllustrator(origin))
+            
+            illustratorMenu.addAction(illustratorAction)
             origin.menuTools.addSeparator()
-            origin.menuTools.addMenu(psMenu)
+            origin.menuTools.addMenu(illustratorMenu)
 
     @err_catcher(name=__name__)
     def customizeExecutable(self, origin, appPath, filepath):
-        self.connectToPhotoshop(origin, filepath=filepath)
+        self.connectToIllustrator(origin, filepath=filepath)
         return True
 
     @err_catcher(name=__name__)
-    def connectToPhotoshop(self, origin, filepath=""):
+    def connectToIllustrator(self, origin, filepath=""):
         pythonPath = self.core.getPythonPath(executable="Prism")
 
-        plugin = self.core.getPlugin("Photoshop")
-        menuPath = os.path.join(plugin.pluginPath, "Prism_Photoshop_MenuTools.py")
+        # Assuming there's an Illustrator-specific script similar to "Prism_Photoshop_MenuTools.py"
+        plugin = self.core.getPlugin("Illustrator")
+        menuPath = os.path.join(plugin.pluginPath, "Prism_Illustrator_MenuTools.py")
+        
+        # Launch the Python script to connect to Illustrator
         subprocess.Popen([pythonPath, menuPath, self.core.prismRoot, "Tools", filepath])
 
     @err_catcher(name=__name__)

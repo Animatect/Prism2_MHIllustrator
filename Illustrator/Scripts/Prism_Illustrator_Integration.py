@@ -50,7 +50,7 @@ if platform.system() == "Windows":
 from PrismUtils.Decorators import err_catcher_plugin as err_catcher
 
 
-class Prism_AfterEffects_Integration(object):
+class Prism_Illustrator_Integration(object):
 	def __init__(self, core, plugin):
 		self.core = core
 		self.plugin = plugin
