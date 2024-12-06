@@ -229,7 +229,7 @@ class Prism_Illustrator_Functions(object):
         try:
             if self.win:  # For Windows
                 doc = self.ilApp.Application.ActiveDocument  # Access Illustrator application
-                currentFileName = doc.FullName if doc.Saved else ""
+                currentFileName = doc.FullName if doc.FullName  else "" #If the FullName property exists, the file has been saved at least once
             else:  # For macOS
                 scpt = (
                     """
@@ -568,7 +568,7 @@ class Prism_Illustrator_Functions(object):
         l_ext = QLabel("Format:")
         l_ext.setMinimumWidth(110)
         self.cb_formats = QComboBox()
-        self.cb_formats.addItems([".jpg", ".png", ".tif", ".exr"])
+        self.cb_formats.addItems([".jpg", ".png", ".tif", ".svg"])
         self.w_location = QWidget()
         self.lo_location = QHBoxLayout()
         self.lo_location.setContentsMargins(0, 0, 0, 0)
@@ -849,17 +849,25 @@ class Prism_Illustrator_Functions(object):
             elif ext == ".png":
                 exportOptions = win32com.client.Dispatch("Illustrator.ExportOptionsPNG24")
                 exportOptions.transparency = True  # Maintain transparency
-                exportType = 2  # Illustrator constant for PNG24
+                exportOptions.artBoardClipping = True
+                activeDoc.ExportFile(
+                    win32com.client.Dispatch(outputPath), 
+                    2,  # ExportType.PNG24
+                    exportOptions
+                )
 
             elif ext in [".tif", ".tiff"]:
                 exportOptions = win32com.client.Dispatch("Illustrator.ExportOptionsTIFF")
                 exportOptions.resolution = 300  # DPI
+                exportOptions.byteOrder = 1  # Byte order (1 = IBM PC, 2 = Macintosh)
+                exportOptions.imageColorSpace = 2  # RGB (2 = RGB, 1 = CMYK)
                 exportType = 3  # Illustrator constant for TIFF
 
             elif ext == ".svg":
                 exportOptions = win32com.client.Dispatch("Illustrator.ExportOptionsSVG")
-                exportOptions.fontSubsetting = 2  # Subset fonts if applicable
+                exportOptions.fontSubsetting = 1  # Subset fonts (1 = None, 2 = Subset)
                 exportOptions.coordinatePrecision = 2  # Precision for SVG coordinates
+                exportOptions.embedRasterImages = True  # Embed raster images
                 exportType = 4  # Illustrator constant for SVG
 
             else:
