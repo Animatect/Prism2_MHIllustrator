@@ -395,6 +395,7 @@ class Prism_Illustrator_Functions(object):
 
     @err_catcher(name=__name__)
     def onProjectBrowserStartup(self, origin):
+        origin.setWindowIcon(QIcon(self.appIcon))
         origin.actionStateManager.setEnabled(False)
         ilMenu = QMenu("Illustrator", origin)
         ilAction = QAction("Open tools", origin)
@@ -486,6 +487,8 @@ class Prism_Illustrator_Functions(object):
     @err_catcher(name=__name__)
     def openIllustratorTools(self):
         self.dlg_tools = QDialog()
+
+        self.dlg_tools.setWindowIcon(QIcon(self.appIcon))
 
         lo_tools = QVBoxLayout()
         self.dlg_tools.setLayout(lo_tools)

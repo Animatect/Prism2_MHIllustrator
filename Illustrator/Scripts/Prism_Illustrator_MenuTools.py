@@ -49,7 +49,9 @@ qapp = QApplication.instance()
 if qapp is None:
     qapp = QApplication(sys.argv)
 
-pcore = PrismCore.create(app="Illustrator", prismArgs=["splash", "noProjectBrowser"])
+# pcore = PrismCore.create(app="Illustrator", prismArgs=["splash", "noProjectBrowser"])
+pcore = PrismCore.create(app="Illustrator", prismArgs=["noSplash", "noProjectBrowser"])
+
 
 if hasattr(pcore.appPlugin, "ilApp") or platform.system() == "Darwin":
     curPrj = pcore.getConfig("globals", "current project")
