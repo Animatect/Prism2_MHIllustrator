@@ -2,7 +2,7 @@ import os
 
 
 def load_stylesheet():
-    sFile = os.path.dirname(__file__) + "/Photoshop.qss"
+    sFile = os.path.dirname(__file__) + "/Illustrator.qss"
     if not os.path.exists(sFile):
         return ""
 
