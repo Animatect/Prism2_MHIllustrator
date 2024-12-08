@@ -568,7 +568,7 @@ class Prism_Illustrator_Functions(object):
         l_ext = QLabel("Format:")
         l_ext.setMinimumWidth(110)
         self.cb_formats = QComboBox()
-        self.cb_formats.addItems([".jpg", ".png", ".tif", ".svg"])
+        self.cb_formats.addItems([".jpg", ".png", ".tif", ".svg", ".psd"])
         self.w_location = QWidget()
         self.lo_location = QHBoxLayout()
         self.lo_location.setContentsMargins(0, 0, 0, 0)
@@ -803,7 +803,7 @@ class Prism_Illustrator_Functions(object):
                 self.dlg_export,
                 "Enter output filename",
                 startLocation,
-                "JPEG (*.jpg *.jpeg);;PNG (*.png);;TIFF (*.tif *.tiff);;SVG (*.svg)",
+                "JPEG (*.jpg *.jpeg);;PNG (*.png);;TIFF (*.tif *.tiff);;SVG (*.svg);;PSD (*.psd)",
             )[0]
 
             if outputPath == "":
@@ -838,37 +838,51 @@ class Prism_Illustrator_Functions(object):
     def exportImageToPath(self, outputPath):
         ext = os.path.splitext(outputPath)[1].lower()
         activeDoc = self.ilApp.ActiveDocument
+        
+        # self.core.popup(f"{activeDoc}")
+        # self.core.copyToClipboard(f"{win32com.client.constants.aiPNG24}")
+        # self.core.popup(f"constants: \npng: {win32com.client.constants.aiPNG24}\njpg: {win32com.client.constants.aiJPEG}")
 
         try:
             # Check if the file extension is supported
             if ext in [".jpg", ".jpeg"]:
                 exportOptions = win32com.client.Dispatch("Illustrator.ExportOptionsJPEG")
-                exportOptions.qualitySetting = 100  # Maximum quality
-                exportType = 1  # Illustrator constant for JPEG
+                exportOptions.QualitySetting = 100  # Maximum quality
+                exportOptions.AntiAliasing = True
+                exportType = win32com.client.constants.aiJPEG #1  # Illustrator constant for JPEG
 
             elif ext == ".png":
                 exportOptions = win32com.client.Dispatch("Illustrator.ExportOptionsPNG24")
-                exportOptions.transparency = True  # Maintain transparency
-                exportOptions.artBoardClipping = True
-                activeDoc.ExportFile(
-                    win32com.client.Dispatch(outputPath), 
-                    2,  # ExportType.PNG24
-                    exportOptions
-                )
+                exportOptions.AntiAliasing = True
+                exportOptions.Transparency = True  # Maintain transparency
+                exportOptions.ArtBoardClipping = True
+                exportOptions.VerticalScale = 100
+                exportOptions.HorizontalScale = 100
+                exportType = win32com.client.constants.aiPNG24 #5
 
             elif ext in [".tif", ".tiff"]:
                 exportOptions = win32com.client.Dispatch("Illustrator.ExportOptionsTIFF")
-                exportOptions.resolution = 300  # DPI
-                exportOptions.byteOrder = 1  # Byte order (1 = IBM PC, 2 = Macintosh)
-                exportOptions.imageColorSpace = 2  # RGB (2 = RGB, 1 = CMYK)
-                exportType = 3  # Illustrator constant for TIFF
+                exportOptions.Resolution = 300  # DPI
+                exportOptions.ByteOrder = 1  # Byte order (1 = IBM PC, 2 = Macintosh)
+                exportOptions.ImageColorSpace = 2  # RGB (2 = RGB, 1 = CMYK)
+                exportType = win32com.client.constants.aiTIFF #9  # Illustrator constant for TIFF
 
             elif ext == ".svg":
                 exportOptions = win32com.client.Dispatch("Illustrator.ExportOptionsSVG")
-                exportOptions.fontSubsetting = 1  # Subset fonts (1 = None, 2 = Subset)
-                exportOptions.coordinatePrecision = 2  # Precision for SVG coordinates
-                exportOptions.embedRasterImages = True  # Embed raster images
-                exportType = 4  # Illustrator constant for SVG
+                exportOptions.FontSubsetting = 1  # Subset fonts (1 = None, 2 = Subset)
+                exportOptions.CoordinatePrecision = 2  # Precision for SVG coordinates
+                exportOptions.EmbedRasterImages = True  # Embed raster images
+                exportType =  win32com.client.constants.aiSVG# 3 # Illustrator constant for SVG
+
+            elif ext == ".psd":
+                exportOptions = win32com.client.Dispatch("Illustrator.ExportOptionsPhotoshop")
+                exportOptions.MaximumEditability = True  # Keep layers editable
+                exportOptions.WriteLayers = True  # Export layers
+                exportOptions.Resolution = 300  # DPI
+                exportOptions.ImageColorSpace = 2  # RGB (2 = RGB, 1 = CMYK)
+                exportType = win32com.client.constants.aiPhotoshop  # Illustrator constant for Photoshop
+
+            
 
             else:
                 QMessageBox.warning(

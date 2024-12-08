@@ -1,0 +1,1 @@
+app.system('start "" "PRISMLIBS/Python311/Prism.exe" "PLUGINROOT/Scripts/Prism_Illustrator_MenuTools.py" "PRISMROOT" ProjectBrowser')
