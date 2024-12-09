@@ -424,65 +424,34 @@ class Prism_Illustrator_Functions(object):
 
         return True
 
-    @err_catcher(name=__name__)
-    def importImages(self, origin):
-        self.photoshopImportSource(origin)
+    # @err_catcher(name=__name__)
+    # def importImages(self, origin):
+    #     self.core.popup("importing IMGS")
+    #     self.illustratorImportSource(origin)
 
-    @err_catcher(name=__name__)
-    def photoshopImportSource(self, origin):
-        filepath = origin.seq[origin.getCurrentFrame()].replace("\\", "/")
-        self.openScene(origin, filepath, force=True)
+    # @err_catcher(name=__name__)
+    # def illustratorImportSource(self, origin):
+    #     filepath = origin.seq[origin.getCurrentFrame()].replace("\\", "/")
+    #     # self.openScene(origin, filepath, force=True)
+    #     doc = self.ilApp.ActiveDocument
+    #     try:
+    #         # Place the image
+    #         placed_item = doc.PlacedItems.Add()
+    #         placed_item.File = filepath  # Set the image file path
+            
+    #         # Optional: Set the position (x, y) in points (0,0 is bottom-left corner)
+    #         placed_item.Top = 500  # Y-coordinate
+    #         placed_item.Left = 100  # X-coordinate
 
-    @err_catcher(name=__name__)
-    def photoshopImportPasses(self, origin):
-        sourceFolder = os.path.dirname(
-            os.path.dirname(os.path.join(origin.basepath, origin.seq[0]))
-        ).replace("\\", "/")
-        passes = [
-            x
-            for x in os.listdir(sourceFolder)
-            if x[-5:] not in ["(mp4)", "(jpg)", "(png)"]
-            and os.path.isdir(os.path.join(sourceFolder, x))
-        ]
+    #         # Optional: Scale the placed image
+    #         placed_item.Width = 200  # Set the width in points
+    #         placed_item.Height = 150  # Set the height in points
 
-        for curPass in passes:
-            curPassPath = os.path.join(sourceFolder, curPass)
+    #         self.core.popup(f"Image successfully placed in Illustrator: {filepath}")
 
-            imgs = os.listdir(curPassPath)
-            if len(imgs) == 0:
-                continue
+    #     except Exception as e:
+    #         print(f"Error placing the image: {e}")
 
-            if len(imgs) > 1:
-                if (
-                    not hasattr(origin, "pstart")
-                    or not hasattr(origin, "pend")
-                    or origin.pstart == "?"
-                    or origin.pend == "?"
-                ):
-                    return
-
-                firstFrame = origin.pstart
-                lastFrame = origin.pend
-
-                curPassName = imgs[0].split(".")[0]
-                increment = "####"
-                curPassFormat = imgs[0].split(".")[-1]
-
-                filePath = os.path.join(
-                    sourceFolder,
-                    curPass,
-                    ".".join([curPassName, increment, curPassFormat]),
-                ).replace("\\", "/")
-            else:
-                filePath = os.path.join(curPassPath, imgs[0]).replace("\\", "/")
-                firstFrame = 0
-                lastFrame = 0
-
-            curReadNode = photoshop.createNode(
-                "Read",
-                "file %s first %s last %s" % (filePath, firstFrame, lastFrame),
-                False,
-            )
 
     @err_catcher(name=__name__)
     def openIllustratorTools(self):
