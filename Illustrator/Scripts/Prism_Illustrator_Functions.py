@@ -511,7 +511,14 @@ class Prism_Illustrator_Functions(object):
         lo_export = QVBoxLayout()
         self.dlg_export.setLayout(lo_export)
 
-        self.rb_task = QRadioButton("Export into current %s" % entityType)
+        # Add radio button and "Is Product" checkbox
+        rb_task_layout = QHBoxLayout()
+        self.rb_task = QRadioButton(f"Export into current {entityType}")
+        self.cb_isProduct = QCheckBox("Is Product")
+        self.cb_isProduct.setChecked(False)  # Default to unchecked
+        rb_task_layout.addWidget(self.rb_task)
+        rb_task_layout.addWidget(self.cb_isProduct)
+
         self.w_task = QWidget()
         lo_prismExport = QVBoxLayout()
         lo_task = QHBoxLayout()
@@ -540,7 +547,7 @@ class Prism_Illustrator_Functions(object):
         l_ext = QLabel("Format:")
         l_ext.setMinimumWidth(110)
         self.cb_formats = QComboBox()
-        self.cb_formats.addItems([".jpg", ".png", ".tif", ".svg", ".psd"])
+        self.cb_formats.addItems([".jpg", ".png", ".tif"])
         self.w_location = QWidget()
         self.lo_location = QHBoxLayout()
         self.lo_location.setContentsMargins(0, 0, 0, 0)
@@ -594,7 +601,7 @@ class Prism_Illustrator_Functions(object):
 
         self.b_export = QPushButton("Export")
 
-        lo_export.addWidget(self.rb_task)
+        lo_export.addLayout(rb_task_layout)
         lo_export.addWidget(self.w_task)
         lo_export.addWidget(rb_custom)
         lo_export.addStretch()
@@ -603,12 +610,16 @@ class Prism_Illustrator_Functions(object):
         self.rb_task.setChecked(True)
         self.dlg_export.resize(400, 300)
 
+        # Connect signals
         self.rb_task.toggled.connect(self.exportToggle)
         self.b_task.clicked.connect(self.exportShowTasks)
         self.le_comment.textChanged.connect(self.validateComment)
         self.chb_useNextVersion.toggled.connect(self.exportVersionToggled)
         self.le_task.editingFinished.connect(self.exportGetVersions)
         self.b_export.clicked.connect(self.saveExport)
+
+        # Connect the "Is Product" checkbox
+        self.cb_isProduct.toggled.connect(self.updateFormatOptions)
 
         self.exportGetTasks()
         self.core.callback(
@@ -622,6 +633,19 @@ class Prism_Illustrator_Functions(object):
         self.cb_formats.setMinimumWidth(300)
 
         return True
+
+    @err_catcher(name=__name__)
+    def updateFormatOptions(self, checkbox):
+        """
+        Updates the format options in the dropdown based on the "Is Product" checkbox state.
+        """
+        if self.cb_isProduct.isChecked():
+            self.cb_formats.clear()
+            self.cb_formats.addItems([".ai", ".svg", ".psd"])
+        else:
+            self.cb_formats.clear()
+            self.cb_formats.addItems([".jpg", ".png", ".tif"])
+
 
     @err_catcher(name=__name__)
     def exportToggle(self, checked):
@@ -674,7 +698,7 @@ class Prism_Illustrator_Functions(object):
         self.cb_versions.addItems(existingVersions)
 
     @err_catcher(name=__name__)
-    def exportGetOutputName(self, useVersion="next"):
+    def exportGetOutputName(self, useVersion="next", isproduct=False):
         if self.le_task.text() == "":
             return
 
@@ -685,19 +709,32 @@ class Prism_Illustrator_Functions(object):
 
         if "type" not in fnameData:
             return
-
+        
         location = self.cb_location.currentText()
-        outputPathData = self.core.mediaProducts.generateMediaProductPath(
-            entity=fnameData,
-            task=task,
-            extension=extension,
-            comment=fnameData.get("comment", ""),
-            framePadding="",
-            version=useVersion if useVersion != "next" else None,
-            location=location,
-            returnDetails=True,
-            mediaType="2drenders",
-        )
+        outputPathData = ""
+        if not isproduct:
+            outputPathData = self.core.mediaProducts.generateMediaProductPath(
+                entity=fnameData,
+                task=task,
+                extension=extension,
+                comment=fnameData.get("comment", ""),
+                framePadding="",
+                version=useVersion if useVersion != "next" else None,
+                location=location,
+                returnDetails=True,
+                mediaType="2drenders",
+            )
+        else:
+            outputPathData = self.core.products.generateProductPath(
+                entity=fnameData,
+                task=task,
+                extension=extension,
+                comment=fnameData.get("comment", ""),
+                framePadding="",
+                version=useVersion if useVersion != "next" else None,
+                location=location,
+                returnDetails=True,
+            )
 
         outputFolder = os.path.dirname(outputPathData["path"])
         hVersion = outputPathData["version"]
@@ -716,6 +753,7 @@ class Prism_Illustrator_Functions(object):
     @err_catcher(name=__name__)
     def saveExport(self):
         if self.rb_task.isChecked():
+            isproduct = self.cb_isProduct.isChecked()
             taskName = self.le_task.text()
             if taskName is None or taskName == "":
                 QMessageBox.warning(
@@ -737,7 +775,7 @@ class Prism_Illustrator_Functions(object):
                 )
                 return
 
-            outputPath, outputDir, hVersion = self.exportGetOutputName(oversion)
+            outputPath, outputDir, hVersion = self.exportGetOutputName(oversion, isproduct)
 
             outLength = len(outputPath)
             if platform.system() == "Windows" and os.getenv("PRISM_IGNORE_PATH_LENGTH") != "1" and outLength > 255:
@@ -853,8 +891,10 @@ class Prism_Illustrator_Functions(object):
                 exportOptions.Resolution = 300  # DPI
                 exportOptions.ImageColorSpace = 2  # RGB (2 = RGB, 1 = CMYK)
                 exportType = win32com.client.constants.aiPhotoshop  # Illustrator constant for Photoshop
-
             
+            elif ext == ".ai":
+                # Get the filetype here so it considers it.
+                pass
 
             else:
                 QMessageBox.warning(
@@ -864,9 +904,13 @@ class Prism_Illustrator_Functions(object):
                 )
                 return False
 
-            # Export the file
-            activeDoc.Export(outputPath, exportType, exportOptions)
-            return True
+            if ext == ".ai":
+                #Save the file
+                self.saveScene(None, outputPath)
+            else:    
+                # Export the file
+                activeDoc.Export(outputPath, exportType, exportOptions)
+                return True
 
         except Exception as e:
             self.core.popup(f"Failed to export the file: {str(e)}")
